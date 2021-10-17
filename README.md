@@ -4,6 +4,13 @@ Easily create a virtual serial port command line program for test or development
 
 [Docs](https://pkg.go.dev/github.com/caiguanhao/mockserialport)
 
+Depends on the `socat` executable. You must install `socat` first.
+
+This also works on Android if you have [Android's socat](https://github.com/jakev/android-binaries/blob/master/socat).
+
+Make sure you have permissions to create device file. For example, you can
+specify socat extra opts like this: `user=1001,group=1001,mode=666`.
+
 ## Usage
 
 ```go
