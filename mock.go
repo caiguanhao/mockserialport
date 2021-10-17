@@ -16,13 +16,14 @@ type (
 	Mock struct {
 		Options *Options
 		Port    Port
+		command *exec.Cmd
 	}
 
 	// Mock options
 	Options struct {
 		InputFile  string // device file for your program to open for read and write
 		OutputFile string // device file for this program to open for read and write
-		PidFile    string // file to store the process id of socat
+		PidFile    string // file to store the process id of socat, defaults to "socat.pid"
 		SocatPath  string // path to the socat executable, defaults to "socat"
 		BaudRate   int    // baud rate (1200/2400/4800/9600/19200/38400/57600/115200)
 		ExtraOpts  string // extra options of socat
@@ -58,31 +59,18 @@ func New(opts *Options) *Mock {
 
 // Start() executes StartSocat() and Read(), which starts a socat process and
 // read data from the virtual serial port.
-func (m *Mock) Start() (err error) {
-	if err = m.StartSocat(); err != nil {
-		return
+func (m *Mock) Start() error {
+	if err := m.StartSocat(); err != nil {
+		return err
 	}
-	i := 0
-	for i < 10 {
-		_, err = os.Stat(m.Options.OutputFile)
-		if err == nil {
-			break
-		}
-		time.Sleep(100 * time.Millisecond)
-		i++
-	}
-	if err != nil {
-		return
-	}
-	err = m.Read()
-	return
+	return m.Read()
 }
 
 // Kill previous socat process (if any) and then start a socat process and
 // write process ID to the pid file.
 func (m *Mock) StartSocat() error {
 	os.Remove(m.Options.OutputFile)
-	pidStr, _ := os.ReadFile(m.Options.PidFile)
+	pidStr, _ := os.ReadFile(m.pidFile())
 	pid, _ := strconv.Atoi(string(pidStr))
 	if pid > 0 {
 		if err := syscall.Kill(pid, syscall.SIGKILL); err != nil {
@@ -111,10 +99,33 @@ func (m *Mock) StartSocat() error {
 		}
 		return err
 	}
+	m.command = cmd
 	if m.Options.Verbose {
 		log.Printf("started socat pid=%d", cmd.Process.Pid)
 	}
-	return os.WriteFile(m.Options.PidFile, []byte(strconv.Itoa(cmd.Process.Pid)), 0666)
+	err := os.WriteFile(m.pidFile(), []byte(strconv.Itoa(cmd.Process.Pid)), 0666)
+	if err != nil {
+		return err
+	}
+	i := 0
+	for i < 10 {
+		_, err = os.Stat(m.Options.OutputFile)
+		if err == nil {
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+		i++
+	}
+	return err
+}
+
+// Terminate current socat process and remove pid file.
+func (m *Mock) Terminate() error {
+	defer os.Remove(m.pidFile())
+	if m.command != nil {
+		return m.command.Process.Signal(syscall.SIGTERM)
+	}
+	return nil
 }
 
 // Read and process data from the virtual serial port.
@@ -166,6 +177,14 @@ func (m *Mock) Write(b []byte) error {
 		log.Printf("=> sent     % X", b)
 	}
 	return nil
+}
+
+func (m *Mock) pidFile() string {
+	pidFile := m.Options.PidFile
+	if pidFile == "" {
+		pidFile = "socat.pid"
+	}
+	return pidFile
 }
 
 // Helper method to set up flags for flag set.
