@@ -189,12 +189,21 @@ func (m *Mock) pidFile() string {
 
 // Helper method to set up flags for flag set.
 func (opts *Options) SetFlags(flag Flag) {
-	flag.StringVar(&opts.InputFile, "i", opts.InputFile, "input file")
-	flag.StringVar(&opts.OutputFile, "o", opts.OutputFile, "output file")
-	flag.StringVar(&opts.PidFile, "pid", opts.PidFile, "pid of socat")
-	flag.StringVar(&opts.SocatPath, "socat", opts.SocatPath, "path of socat executable")
-	flag.IntVar(&opts.BaudRate, "baudrate", opts.BaudRate, "baud rate")
-	flag.StringVar(&opts.ExtraOpts, "opts", opts.ExtraOpts, "extra options for socat")
+	opts.SetFlagsPrefix(flag, "")
+}
+
+// Helper method to set up flags (with prefix) for flag set.
+func (opts *Options) SetFlagsPrefix(flag Flag, prefix string) {
+	var np string
+	if prefix != "" {
+		np = prefix + "-"
+	}
+	flag.StringVar(&opts.InputFile, np+"i", opts.InputFile, "input file")
+	flag.StringVar(&opts.OutputFile, np+"o", opts.OutputFile, "output file")
+	flag.StringVar(&opts.PidFile, np+"pid", opts.PidFile, "pid of socat")
+	flag.StringVar(&opts.SocatPath, np+"socat", opts.SocatPath, "path of socat executable")
+	flag.IntVar(&opts.BaudRate, np+"baudrate", opts.BaudRate, "baud rate")
+	flag.StringVar(&opts.ExtraOpts, np+"opts", opts.ExtraOpts, "extra options for socat")
 }
 
 // Return command line arguments of socat.
